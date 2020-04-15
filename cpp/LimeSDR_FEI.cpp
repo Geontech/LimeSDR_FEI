@@ -60,7 +60,6 @@ void LimeSDR_FEI_i::Error(std::string err) {
     throw FRONTEND::FrontendException(err.c_str());
 }
 
-
 void LimeSDR_FEI_i::constructor() {
 	// Find attached devices
 	int num_devices;
@@ -74,7 +73,7 @@ void LimeSDR_FEI_i::constructor() {
 		// TODO how to exit properly? or just wait and have a way to try again later?
 		//this->stop();
 
-	} else {
+	}else {
 
 		std::cout << "Devices found " << std::endl;
 		for (int i = 0; i < num_devices; i++) {
@@ -331,8 +330,8 @@ int LimeSDR_FEI_i::serviceFunction() {
 		std::cout << "end " << std::endl;
 		*/
 	}
-
-	return NOOP;
+    
+    return NOOP;
 }
 
 /*************************************************************
@@ -811,7 +810,7 @@ void LimeSDR_FEI_i::setTunerBandwidth(const std::string& allocation_id, double b
     if(allocation_id != getControlAllocationId(idx))
         throw FRONTEND::FrontendException(("ID "+allocation_id+" does not have authorization to modify the tuner").c_str());
     if (bw<0) throw FRONTEND::BadParameterException("Bandwidth cannot be less than 0");
-
+    
     // set hardware to new value. Raise an exception if it's not possible
 	double* actual_bw;
     if (frontend_tuner_status[idx].tuner_type == "RX_DIGITIZER") {
