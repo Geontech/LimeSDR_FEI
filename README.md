@@ -1,7 +1,6 @@
 # LimeSDR Redhawk Device
 
 
-
 ## Dependencies on CentOS 7
 You will need `cmake3` from EPEL:
 
