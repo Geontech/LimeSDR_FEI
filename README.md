@@ -116,7 +116,17 @@ With the Redhawk IDE open, navigate to the `REDHAWK Explorer` panel > `Target SD
 
 TODO there are bugs with this. Not sure what acceptable values are and no data shows up when it says it's successful.... Probably need to update API's for both LimeSDR and Redhawk Device since it's been 2 years.
 
+## Testing
 
+### FM Test
 
-
+1. After installing the LimeSDR_FEI go to TARGET SDR > Node > Right click on LimeSDR_FEI
+2. Click `Launch Device Manager`
+3. Connect to the TOA
+4. Expand Device Managers > LimeSDR_FEI > LimeSDR_FEI_1 > FrontEnd Tuner 
+5. Right click on RX_Digitizer and press allocate
+6. Enter in 90MHz center frequency, 10MHz bandwidth, 20Msps sample rate, and then click OK
+7. Right click dataFloat_out and then "Plot FFT"
+8. Review the Raster graph
+9. Zoom in on each dark white line and identify where the peak of the frequency is (check for the existence of this station)
 
