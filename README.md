@@ -116,9 +116,10 @@ With the Redhawk IDE open, navigate to the `REDHAWK Explorer` panel > `Target SD
 
 TODO there are bugs with this. Not sure what acceptable values are and no data shows up when it says it's successful.... Probably need to update API's for both LimeSDR and Redhawk Device since it's been 2 years.
 
-## Testing
+## Testing LimeSDR Redhawk Device
 
 ### FM Test
+Test the LimeSDR device by checking that the receiver can pick up the local FM radio stations.
 
 1. After installing the LimeSDR_FEI go to TARGET SDR > Node > Right click on LimeSDR_FEI
 2. Click `Launch Device Manager`
