@@ -10,7 +10,8 @@ test:
   before_script:
     - 'yum update -y'
     - 'yum install -y epel-release' 
-    - 'yum install -y cmake3 boost-devel gnuplot'
+    - 'yum groupinstall -y "Development Tools"'
+    - 'yum install -y git cmake3 boost-devel gnuplot'
     - 'yum install libusb* -y'
     - 'yum install sqlite sqlite-devel -y'
     - 'yum install bzip2'
