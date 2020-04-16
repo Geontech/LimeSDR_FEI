@@ -12,7 +12,7 @@ test:
     - 'yum install -y epel-release' 
     - 'yum groupinstall -y "Development Tools" "Development Libraries"'
     - 'yum install make automake gcc gcc-c++'
-    - 'yum install gtk+-devel gtk2-devel'
+    - 'yum install gtk+-devel'
     - 'yum install -y git cmake3 boost-devel gnuplot'
     - 'yum install libusb* -y'
     - 'yum install sqlite sqlite-devel -y'
