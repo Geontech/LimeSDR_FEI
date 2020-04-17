@@ -17,6 +17,7 @@ test:
     - 'yum install sqlite sqlite-devel -y'
     - 'yum install bzip2'
     - 'makedir -p ~/bin/ && cd ~/bin/'
+    - 'yum install gtk2-devel'
     - 'wget https://github.com/wxWidgets/wxWidgets/releases/download/v3.1.0/wxWidgets-3.1.0.tar.bz2'
     - 'tar -xf wxWidgets-3.1.0.tar.bz2'
     - 'cd wxWidgets-3.1.0/'
