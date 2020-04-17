@@ -41,7 +41,9 @@ test:
     - 'export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH'
 
   script:
+    - 'if [ $(LimeUtil --info | grep FX3) == "" ]; then exit 1; else echo "FX3 is present"; fi'
     - 'LimeUtil --info'
-    - 'redhawk-codegen --frontend ${CI_PROJECT_NAME}.spd.xml'
+    - 'FILE=$(ls ./*spd.xml)'
+    - 'redhawk-codegen --frontend ${FILE}.spd.xml'
     - './build.sh'
     - './build.sh install'
