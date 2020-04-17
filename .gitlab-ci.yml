@@ -8,6 +8,7 @@ image:
 test:
   stage: test
   before_script:
+    - 'DIR=$(pwd)'
     - 'yum update -y'
     - 'yum install -y epel-release' 
     - 'yum groupinstall -y "Development Tools" "Development Libraries"'
@@ -27,7 +28,7 @@ test:
     - './configure --with-opengl --disable-shared --enable-monolithic --with-libjpeg --with-libtiff --with-libpng --with-zlib --disable-sdltest --enable-unicode --enable-display --enable-propgrid --disable-webkit --disable-webview --disable-webviewwebkit --prefix=`echo ~/bin/wxWidgets-staticlib` CXXFLAGS="-std=c++0x"'
     - 'make -j4'
     - 'make install'
-    - 'cd /tmp'
+    - 'cd -'
     - 'git clone https://github.com/myriadrf/LimeSuite'
     - 'cd LimeSuite'
     - 'git checkout stable'
@@ -39,6 +40,7 @@ test:
     - 'cd ../udev-rules'
     - 'sudo ./install.sh'
     - 'export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH'
+    - 'cd -'
 
   script:
     - 'if [ $(LimeUtil --info | grep FX3) == "" ]; then exit 1; else echo "FX3 is present"; fi'
