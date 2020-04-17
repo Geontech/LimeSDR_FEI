@@ -8,7 +8,6 @@ image:
 test:
   stage: test
   before_script:
-    - 'DIR=$(pwd)'
     - 'yum update -y'
     - 'yum install -y epel-release' 
     - 'yum groupinstall -y "Development Tools" "Development Libraries"'
@@ -53,3 +52,4 @@ test:
     - 'redhawk-codegen --frontend LimeSDR_FEI.spd.xml'
     - './build.sh'
     - './build.sh install'
+    - './tests/test_LimeSDR_FEI.py'
