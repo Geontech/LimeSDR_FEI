@@ -131,3 +131,7 @@ Test the LimeSDR device by checking that the receiver can pick up the local FM r
 8. Review the Raster graph
 9. Zoom in on each dark white line and identify where the peak of the frequency is (check for the existence of this station)
 
+### Loopback RF Test
+The LimeSDR has a max TX RF output power of 0dBm and RX RF input power of +12dBm.
+
+1. Connect an RF cable from RX to TX on the LimeSDR mini
