@@ -243,7 +243,7 @@ struct channel_struct {
     }
 
     static std::string getId() {
-        return std::string("channels::channel");
+        return std::string("device_channels::channel");
     }
 
     static const char* getFormat() {

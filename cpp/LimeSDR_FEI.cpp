@@ -18,7 +18,7 @@ typedef std::numeric_limits<double> dbl;
 lms_device_t* device = NULL;
 
 // TODO handle more than one stream, how to pass/access proper stream when stuff happens?
-lms_stream_t streamId;
+lms_stream_t streamId[2];
 
 bool channel_active = false;
 
@@ -235,19 +235,123 @@ void LimeSDR_FEI_i::constructor() {
 		//################################################################################################
 
 	}
+
+	start();
 }
 
-int LimeSDR_FEI_i::serviceFunction() {
+void LimeSDR_FEI_i::start() throw (CF::Resource::StartError, CORBA::SystemException) {
+	std::cout << "TEST THIS" << std::endl;
+	LimeSDR_FEI_base::start();
+	dataFloatTX_in->unblock();
+
+	try {
+		{
+            exclusive_lock lock(receive_service_thread_lock);
+            if (receive_service_thread == NULL) {
+                receive_service_thread = new MultiProcessThread<LimeSDR_FEI_i> (this, &LimeSDR_FEI_i::serviceFunctionReceive, 0.001);
+                receive_service_thread->start();
+            }
+		}
+        {
+            exclusive_lock lock(transmit_service_thread_lock);
+            if (transmit_service_thread == NULL) {
+                transmit_service_thread = new MultiProcessThread<LimeSDR_FEI_i> (this, &LimeSDR_FEI_i::serviceFunctionTransmit, 0.001);
+                transmit_service_thread->start();
+            }
+        }
+	}
+	catch (...) {
+		stop();
+		throw;
+	}
+}
+
+void LimeSDR_FEI_i::stop() throw (CF::Resource::StopError, CORBA::SystemException) {
+	std::cout << "TEST THIS" << std::endl;
+	dataFloatTX_in->block();
+
+    {
+        exclusive_lock lock(receive_service_thread_lock);
+        // release the child thread (if it exists)
+        if (receive_service_thread != 0) {
+            //dataShortTX_in->block();
+            //dataShortTX_in->block();
+            //TODO - force EOS/disable for each allocated tuner? or
+            if (!receive_service_thread->release(2)) {
+                throw CF::Resource::StopError(CF::CF_NOTSET,"Receive processing thread did not die");
+            }
+            delete receive_service_thread;
+            receive_service_thread = 0;
+        }
+    }
+
+
+    {
+        exclusive_lock lock(transmit_service_thread_lock);
+        // release the child thread (if it exists)
+        if (transmit_service_thread != 0) {
+            if (!transmit_service_thread->release(2)) {
+                throw CF::Resource::StopError(CF::CF_NOTSET,"Transmit processing thread did not die");
+            }
+            delete transmit_service_thread;
+            transmit_service_thread = 0;
+        }
+    }
+
+    // iterate through tuners to disable any enabled tuners
+    /*for (size_t tuner_id = 0; tuner_id < frontend_tuner_status.size(); tuner_id++) {
+        deviceDisable(tuner_id);
+    }*/
+
+	LimeSDR_FEI_base::stop();
+}
+
+int LimeSDR_FEI_i::serviceFunctionTransmit() {
+	bool ret = transmitHelper(dataFloatTX_in);
+	if (ret)
+		return NORMAL;
+	return NOOP;
+}
+
+/** A templated service function that is generic between data types. */
+template <class IN_PORT_TYPE> bool LimeSDR_FEI_i::transmitHelper(IN_PORT_TYPE *dataIn) {
+    typename IN_PORT_TYPE::dataTransfer *packet = dataIn->getPacket(0);
+    if (packet == NULL)
+        return false;
+
+    if (packet->inputQueueFlushed){
+        LOG_WARN(LimeSDR_FEI_i,"Input Queue Flushed");
+    }
+
+    if (packet->SRI.mode != 1) {
+        LOG_ERROR(LimeSDR_FEI_i,"USRP device requires complex data.  Real data type received.");
+        delete packet;
+        return false;
+    }
+
+	return false;
+}
+
+int LimeSDR_FEI_i::serviceFunctionReceive() {
 
 	// only do stuff if there's a device, serviceFunction gets called even if no device found in constructor
 	if (device && channel_active) {
+		/*for (size_t tuner_id = 0; tuner_id < frontend_tuner_status.size(); tuner_id++) {
+			if (frontend_tuner_status[tuner_id].tuner_type != "RX_DIGITIZER")
+				continue;
+
+			if (getControlAllocationId(tuner_id).empty()) {
+				continue;
+
+			}
+		}*/
 		// receive samples (non-blocking?)
 		// TODO make some of this properties
 		lms_stream_meta_t metadata;
 		//metadata.timestamp            // either the rx timestamp or time that tx should start
 		//metadata.waitForTimestamp     // wait for specified timestamp before receiving or transmitting
 		int timeout_ms = 1000;
-		int samplesRead = LMS_RecvStream(&streamId, buffer, numsamples, &metadata, timeout_ms);
+		int samplesRead = LMS_RecvStream(&(streamId[0]), buffer, numsamples, &metadata, timeout_ms);
 
 		//std::cout << "Number of Samples: " << samplesRead << std::endl;
 		//std::cout << "Data Timestamp: " << metadata.timestamp << std::endl;
@@ -628,8 +732,9 @@ void LimeSDR_FEI_i::deviceEnable(frontend_tuner_status_struct_struct &fts, size_
 
 	// tell device to start streaming data
 	// TODO if that's what this does, then why is the timestamp/waitForTimestamp fields not part of SetupStream for RX?
-	LMS_StartStream(&streamId);
-
+	for (int id = 0; id < 2; id++) {
+		LMS_StartStream(&(streamId[id]));
+	}
 	// update frontend_tuner_status struct
 	fts.enabled = true;
 
@@ -647,8 +752,9 @@ void LimeSDR_FEI_i::deviceDisable(frontend_tuner_status_struct_struct &fts, size
     ************************************************************/
     LOG_DEBUG(LimeSDR_FEI_i, "--> deviceDisable()");
 
-	LMS_StopStream(&streamId);   // stream is stopped but can be started again with LMS_StartStream()
-
+    for (int id = 0; id < 2; id++) {
+    	LMS_StopStream(&(streamId[id]));   // stream is stopped but can be started again with LMS_StartStream()
+    }
 	// update frontend_tuner_status struct
 	fts.enabled = false;
 
@@ -710,15 +816,35 @@ bool LimeSDR_FEI_i::deviceSetTuning(const frontend::frontend_tuner_allocation_st
 	// TODO this function needs to set sample rate as the request if within tolerance....
 	getChannelStatus(channel, transmit);
 
+	int id = 0;
+	if (transmit) {
+		id = 1;
+	}
+
+	std::cout << "TEST " << std::endl;
+	std::cout << "Channel: " << streamId[id].channel << std::endl;
+	std::cout << "fifoSize: " << streamId[id].fifoSize << std::endl;
+	std::cout << "throughputVsLatency: " << streamId[id].throughputVsLatency << std::endl;
+	std::cout << "isTx: " << streamId[id].isTx << std::endl;
+	std::cout << "dataFmt:  " << streamId[id].dataFmt << std::endl;
+
 	// initialize stream
 	// TODO make some of these things properties?
-	streamId.channel = channel;                      // channel number to stream from
-	streamId.fifoSize = 1024 * 1024;                 // fifo size in samples
-	streamId.throughputVsLatency = 1.0;              // optimize for max throughput
-	streamId.isTx = transmit;                        // TX or RX channel
-	streamId.dataFmt = lms_stream_t::LMS_FMT_F32;    // 32-bit floats
 
-	if (LMS_SetupStream(device, &streamId) != 0) { Error(LMS_GetLastErrorMessage()); }
+	streamId[id].channel = channel;                      // channel number to stream from
+	streamId[id].fifoSize = 1024 * 1024;                 // fifo size in samples
+	streamId[id].throughputVsLatency = 1.0;              // optimize for max throughput
+	streamId[id].isTx = transmit;                        // TX or RX channel
+	streamId[id].dataFmt = lms_stream_t::LMS_FMT_F32;    // 32-bit floats
+
+	std::cout << "TEST " << std::endl;
+	std::cout << "Channel: " << streamId[id].channel << std::endl;
+	std::cout << "fifoSize: " << streamId[id].fifoSize << std::endl;
+	std::cout << "throughputVsLatency: " << streamId[id].throughputVsLatency << std::endl;
+	std::cout << "isTx: " << streamId[id].isTx << std::endl;
+	std::cout << "dataFmt:  " << streamId[id].dataFmt << std::endl;
+
+	if (LMS_SetupStream(device, &(streamId[id])) != 0) { Error(LMS_GetLastErrorMessage()); }
 
 	// TODO do I need to set anything in 'fts' since getChannelStatus finds and updates the structures anyway?
 	//fts.bandwidth = request.bandwidth;
@@ -736,7 +862,8 @@ bool LimeSDR_FEI_i::deviceDeleteTuning(frontend_tuner_status_struct_struct &fts,
     ************************************************************/
     LOG_DEBUG(LimeSDR_FEI_i, "--> deviceDeleteTuning()");
 
-	LMS_DestroyStream(device, &streamId);  // stream is deallocated and can no longer be used
+	LMS_DestroyStream(device, &(streamId[0]));  // stream is deallocated and can no longer be used
+	LMS_DestroyStream(device, &(streamId[1]));  // stream is deallocated and can no longer be used
 
     LOG_DEBUG(LimeSDR_FEI_i, "<-- deviceDeleteTuning()");
     return true;
