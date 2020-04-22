@@ -704,13 +704,20 @@ void LimeSDR_FEI_i::getAdvancedControlStatus(int channel, bool transmit) {
 
 void LimeSDR_FEI_i::allocateLimeSDR(int channel, bool transmit, double freq, double sample_rate, int oversample_ratio, double bandwidth, double gain) {
     LOG_DEBUG(LimeSDR_FEI_i, "--> allocateLimeSDR()");
+    static bool sample = false;
+
     // TODO difference between EnableChannel and SetupStream/StartStream.....?
 	if (LMS_EnableChannel(device, transmit, channel, true) != 0) { Error(LMS_GetLastErrorMessage()); }
 	std::cout << "LMS_EnableChannel" << std::endl;
     if (LMS_SetLOFrequency(device, transmit, channel, freq) != 0) { Error(LMS_GetLastErrorMessage()); }
 	std::cout << "LMS_SetLOFrequency" << std::endl;
-    if (LMS_SetSampleRate(device, sample_rate, oversample_ratio) != 0) { Error(LMS_GetLastErrorMessage()); } // preferred oversampling in RF, this set sampling rate for all channels
-	std::cout << "LMS_SetSampleRate" << std::endl;
+
+	if (!sample) {
+		if (LMS_SetSampleRate(device, sample_rate, oversample_ratio) != 0) { Error(LMS_GetLastErrorMessage()); } // preferred oversampling in RF, this set sampling rate for all channels
+		std::cout << "LMS_SetSampleRate" << std::endl;
+		sample = true;
+	}
+
 	if (LMS_SetLPFBW(device, transmit, channel, bandwidth) != 0) { Error(LMS_GetLastErrorMessage()); }      // configure LPF
 	std::cout << "LMS_SetLPFBW" << std::endl;
 //	if (LMS_SetGaindB(device, transmit, channel, gain) != 0) { Error(LMS_GetLastErrorMessage()); }  // set RX gain
@@ -732,9 +739,11 @@ void LimeSDR_FEI_i::deviceEnable(frontend_tuner_status_struct_struct &fts, size_
 
 	// tell device to start streaming data
 	// TODO if that's what this does, then why is the timestamp/waitForTimestamp fields not part of SetupStream for RX?
-	for (int id = 0; id < 2; id++) {
-		LMS_StartStream(&(streamId[id]));
-	}
+	int id = 0;
+    if (fts.tuner_type == "TX") { id = 1; }
+
+    LMS_StartStream(&(streamId[id]));
+
 	// update frontend_tuner_status struct
 	fts.enabled = true;
 
@@ -752,9 +761,11 @@ void LimeSDR_FEI_i::deviceDisable(frontend_tuner_status_struct_struct &fts, size
     ************************************************************/
     LOG_DEBUG(LimeSDR_FEI_i, "--> deviceDisable()");
 
-    for (int id = 0; id < 2; id++) {
-    	LMS_StopStream(&(streamId[id]));   // stream is stopped but can be started again with LMS_StartStream()
-    }
+    int id = 0;
+    if (fts.tuner_type == "TX") { id = 1; }
+
+    LMS_StopStream(&(streamId[id]));   // stream is stopped but can be started again with LMS_StartStream()
+
 	// update frontend_tuner_status struct
 	fts.enabled = false;
 
@@ -861,9 +872,9 @@ bool LimeSDR_FEI_i::deviceDeleteTuning(frontend_tuner_status_struct_struct &fts,
     return true if the tune deletion succeeded, and false if it failed
     ************************************************************/
     LOG_DEBUG(LimeSDR_FEI_i, "--> deviceDeleteTuning()");
-
-	LMS_DestroyStream(device, &(streamId[0]));  // stream is deallocated and can no longer be used
-	LMS_DestroyStream(device, &(streamId[1]));  // stream is deallocated and can no longer be used
+    int id = 0;
+    if (fts.tuner_type == "TX") { id = 1; }
+	LMS_DestroyStream(device, &(streamId[id]));  // stream is deallocated and can no longer be used
 
     LOG_DEBUG(LimeSDR_FEI_i, "<-- deviceDeleteTuning()");
     return true;
