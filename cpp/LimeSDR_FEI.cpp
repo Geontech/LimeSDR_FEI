@@ -832,13 +832,6 @@ bool LimeSDR_FEI_i::deviceSetTuning(const frontend::frontend_tuner_allocation_st
 		id = 1;
 	}
 
-	std::cout << "TEST " << std::endl;
-	std::cout << "Channel: " << streamId[id].channel << std::endl;
-	std::cout << "fifoSize: " << streamId[id].fifoSize << std::endl;
-	std::cout << "throughputVsLatency: " << streamId[id].throughputVsLatency << std::endl;
-	std::cout << "isTx: " << streamId[id].isTx << std::endl;
-	std::cout << "dataFmt:  " << streamId[id].dataFmt << std::endl;
-
 	// initialize stream
 	// TODO make some of these things properties?
 
@@ -847,13 +840,6 @@ bool LimeSDR_FEI_i::deviceSetTuning(const frontend::frontend_tuner_allocation_st
 	streamId[id].throughputVsLatency = 1.0;              // optimize for max throughput
 	streamId[id].isTx = transmit;                        // TX or RX channel
 	streamId[id].dataFmt = lms_stream_t::LMS_FMT_F32;    // 32-bit floats
-
-	std::cout << "TEST " << std::endl;
-	std::cout << "Channel: " << streamId[id].channel << std::endl;
-	std::cout << "fifoSize: " << streamId[id].fifoSize << std::endl;
-	std::cout << "throughputVsLatency: " << streamId[id].throughputVsLatency << std::endl;
-	std::cout << "isTx: " << streamId[id].isTx << std::endl;
-	std::cout << "dataFmt:  " << streamId[id].dataFmt << std::endl;
 
 	if (LMS_SetupStream(device, &(streamId[id])) != 0) { Error(LMS_GetLastErrorMessage()); }
 
