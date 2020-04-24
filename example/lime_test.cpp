@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <mutex>
 #include <math.h>
+#include <stdlib.h>
+#include <string>.
 #include "lime/LimeSuite.h"
 
 using namespace std;
@@ -53,7 +55,7 @@ int device_init(double sample_rate) {
     return 0;
 }
 
-int rx_init(){
+int rx_init(double rxgain){
 
     //Enable RX channel
     //Channels are numbered starting at 0
@@ -64,6 +66,9 @@ int rx_init(){
     if (LMS_SetLOFrequency(device, LMS_CH_RX, 0, 800e6) != 0)
         error();
 
+	if (LMS_SetNormalizedGain(device, LMS_CH_RX, 0, rxgain) != 0)
+	    error();
+		    
     //Enable test signal generation
     //To receive data from RF, remove this line or change signal to LMS_TESTSIG_NONE
     //if (LMS_SetTestSignal(device, LMS_CH_RX, 0, LMS_TESTSIG_NCODIV8, 0, 0) != 0)
@@ -83,7 +88,7 @@ int rx_init(){
     rx_metadata.waitForTimestamp = false; //currently has no effect in RX
 }
 
-int tx_init(double frequency, double sample_rate) {
+int tx_init(double frequency, double sample_rate, double txgain) {
 
     //Enable TX channel,Channels are numbered starting at 0
     if (LMS_EnableChannel(device, LMS_CH_TX, 0, true)!=0)
@@ -104,7 +109,7 @@ int tx_init(double frequency, double sample_rate) {
         error();
 
     //set TX gain
-    if (LMS_SetNormalizedGain(device, LMS_CH_TX, 0, 0.7) != 0)
+    if (LMS_SetNormalizedGain(device, LMS_CH_TX, 0, txgain) != 0)
         error();
 
     //calibrate Tx, continue on failure
@@ -134,8 +139,11 @@ void RX() {
         printf("Received %d samples\n", samplesRead);
         
         for (int i = 0; i < samplesRead; i++) {
-		    if (buffer[i] > .5 || buffer[i] < -.5) {
-		    	std::cout << "BUFFER: " << buffer[i] << std::endl;
+		    if (buffer[i] > .5) {
+		    	std::cout << "REAL: " << buffer[i] << std::endl;
+		   	}
+		   	else if(buffer[i] < -.5) {
+		    	std::cout << "IMAG: " << buffer[i] << std::endl;
 		   	}
         }
 	/*
@@ -150,10 +158,10 @@ void RX() {
 
 }
 
-void getStats(){ 
+void getStats(bool stats){ 
     auto t1 = chrono::high_resolution_clock::now();
     auto t2 = t1;
-	while(true) {
+	while(true && stats) {
         //Print data rate (once per second)
         if (chrono::high_resolution_clock::now() - t2 > chrono::seconds(1))
         {
@@ -161,10 +169,12 @@ void getStats(){
             LMS_GetStreamStatus(&streams[0], &status); //Obtain RX stream stats
             cout << "RX rate: " << status.linkRate / 1e6 << " MB/s\n"; //link data rate (both channels))
             cout << "RX 0 FIFO: " << 100 * status.fifoFilledCount / status.fifoSize << "%" << endl; //percentage of RX 0 fifo filled
+            cout << "RX dropped: " << status.droppedPackets << std::endl;
 
             LMS_GetStreamStatus(&streams[1], &status); //Obtain TX stream stats
             cout << "TX rate: " << status.linkRate / 1e6 << " MB/s\n"; //link data rate (both channels))
             cout << "TX 0 FIFO: " << 100 * status.fifoFilledCount / status.fifoSize << "%" << endl; //percentage of TX 0 fifo filled
+            cout << "TX dropped: " << status.droppedPackets << std::endl;
         }
 	
 	}
@@ -210,7 +220,21 @@ void TX(double f_ratio, double tone_freq) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+	std::string::size_type sz;
+	double rxgain, txgain;
+	bool stats = true;
+	
+	if (argc != 4) {
+		std::cout << "usage: " << argv[0] << " <rxgain> <txgain> <stats>" << std::endl;
+		return 0;
+	}
+	else {
+		rxgain = std::atof(argv[1]);
+		txgain = std::atof(argv[2]);
+		stats = std::atoi(argv[3]);
+	}
+
 	const double frequency = 500e6;  //center frequency to 500 MHz
     const double sample_rate = 5e6;    //sample rate to 5 MHz
     const double tone_freq = 1e6; //tone frequency
@@ -220,13 +244,13 @@ int main() {
 		return 255;
 	}
 	
-	rx_init();
-	tx_init(frequency, sample_rate);
+	rx_init(rxgain);
+	tx_init(frequency, sample_rate, txgain);
 	
 	
 	std::thread rx (RX);
 	std::thread tx (TX, f_ratio, tone_freq);
-	std::thread get_stats (getStats);
+	std::thread get_stats (getStats, stats);
 	
 	std::cout << "Started RX and TX" << std::endl;
 	
