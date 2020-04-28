@@ -315,7 +315,10 @@ int LimeSDR_FEI_i::serviceFunctionTransmit() {
 
 /** A templated service function that is generic between data types. */
 template <class IN_PORT_TYPE> bool LimeSDR_FEI_i::transmitHelper(IN_PORT_TYPE *dataIn) {
-    typename IN_PORT_TYPE::dataTransfer *packet = dataIn->getPacket(0);
+    unsigned int timeout_ms = 1000;
+    lms_stream_meta_t meta_tx;
+
+	typename IN_PORT_TYPE::dataTransfer *packet = dataIn->getPacket(0);
     if (packet == NULL)
         return false;
 
@@ -324,12 +327,39 @@ template <class IN_PORT_TYPE> bool LimeSDR_FEI_i::transmitHelper(IN_PORT_TYPE *d
     }
 
     if (packet->SRI.mode != 1) {
-        LOG_ERROR(LimeSDR_FEI_i,"USRP device requires complex data.  Real data type received.");
+        LOG_ERROR(LimeSDR_FEI_i,"LimeSDR_FEI device requires complex data.  Real data type received.");
         delete packet;
         return false;
     }
 
-	return false;
+    for (size_t tuner_id = 0; tuner_id < frontend_tuner_status.size(); tuner_id++) {
+            //Check to see if wideband channel is either not allocated, or the output is not enabled
+            if (frontend_tuner_status[tuner_id].tuner_type != "TX") { continue; }
+
+
+            //std::cout << "TX " << tuner_id << std::endl;
+            //Check to see if channel is allocated
+            if (getControlAllocationId(tuner_id).empty()){
+                continue;
+            }
+
+            //scoped_tuner_lock tuner_lock(usrp_tuners[tuner_id].lock);
+
+            //Check to make sure channel is allocated still
+            if (getControlAllocationId(tuner_id).empty()){ continue; }
+
+            //Check to see if wideband channel is enabled
+            if (!frontend_tuner_status[tuner_id].enabled){ continue; }
+
+            int ret = LMS_SendStream(&(streamId[1]), &packet->dataBuffer.front(), packet->dataBuffer.size() / 2, &meta_tx, timeout_ms);
+            //std::cout << "SendStream " << packet->dataBuffer.size() << std::endl;
+            if (ret != packet->dataBuffer.size()/2) {
+            	std::cout << "Failed! " << ret << "/" << packet->dataBuffer.size()/2 << std::endl;
+            }
+    }
+
+    delete packet;
+	return true;
 }
 
 int LimeSDR_FEI_i::serviceFunctionReceive() {
@@ -369,70 +399,77 @@ int LimeSDR_FEI_i::serviceFunctionReceive() {
 		}
 
 		// create SRI
-		std::string stream_id = "my_stream_id";
-		BULKIO::StreamSRI sri = this->create(stream_id, this->frontend_tuner_status[0], this->frontend_tuner_status[0].center_frequency);
-		// TODO have to set SRI as complex, create() doesn't seem to read the complex boolean in frontend_tuner_status
-		sri.mode = 1; // complex mode
-		/*
-        std::cout << "SRI streamID: " << sri.streamID << std::endl;
-		std::cout << "SRI mode:     " << sri.mode << std::endl;     // complex=1, scalar=0
-		std::cout << "SRI hversion: " << sri.hversion << std::endl; // version of Stream SRI header
-		std::cout << "SRI xstart:   " << sri.xstart << std::endl;   // start time of first sample relative to Epoch
-		std::cout << "SRI xdelta:   " << sri.xdelta << std::endl;   // interval between samples
-		std::cout << "SRI xunits:   " << sri.xunits << std::endl;   // units of xstart and xdelta, usually BULKIO::UNITS_TIME for samples
-		std::cout << "SRI ystart:   " << sri.ystart << std::endl;   // unused for sample data
-		std::cout << "SRI ydelta:   " << sri.ydelta << std::endl;   // unused for sample data
-		std::cout << "SRI yunits:   " << sri.yunits << std::endl;   // unused for sample data
-		std::cout << "SRI subsize:  " << sri.subsize << std::endl;  // = 0 for sample data
-		 */
-		// TODO when do I update SRI?
-		bool sriChanged = false;
 
-		// If there is no output stream open, create one
-		if (!outputStream) {
-			outputStream = dataFloat_out->createStream(sri);
-		} else if (sriChanged) {			// Update output SRI
-			outputStream.sri(sri);
-		}
+	    for (size_t tuner_id = 0; tuner_id < frontend_tuner_status.size(); tuner_id++) {
+	            //Check to see if wideband channel is either not allocated, or the output is not enabled
+	            if (frontend_tuner_status[tuner_id].tuner_type != "RX_DIGITIZER") { continue; }
 
-		// copy timestamp from LimeSDR into BulkIO type
-		// TODO LimeSDR timestamp is just tick mark based on start time... not sure what units are or how to map to UTC
-		BULKIO::PrecisionUTCTime tstamp;
-		tstamp.tcmode = 1; // deprecated, default value
-		tstamp.tcstatus = BULKIO::TCS_INVALID; // indicates whether timestamp is valid and should be used
-		tstamp.toff = 0; // fractional sample offset
-		tstamp.twsec = metadata.timestamp; // whole seconds from Epoch
-		tstamp.tfsec = 0; // fractional seconds from Epoch
+	            std::string stream_id = "my_stream_id";
+				BULKIO::StreamSRI sri = this->create(stream_id, this->frontend_tuner_status[tuner_id], this->frontend_tuner_status[tuner_id].center_frequency);
+				// TODO have to set SRI as complex, create() doesn't seem to read the complex boolean in frontend_tuner_status
+				sri.mode = 1; // complex mode
+				/*
+				std::cout << "SRI streamID: " << sri.streamID << std::endl;
+				std::cout << "SRI mode:     " << sri.mode << std::endl;     // complex=1, scalar=0
+				std::cout << "SRI hversion: " << sri.hversion << std::endl; // version of Stream SRI header
+				std::cout << "SRI xstart:   " << sri.xstart << std::endl;   // start time of first sample relative to Epoch
+				std::cout << "SRI xdelta:   " << sri.xdelta << std::endl;   // interval between samples
+				std::cout << "SRI xunits:   " << sri.xunits << std::endl;   // units of xstart and xdelta, usually BULKIO::UNITS_TIME for samples
+				std::cout << "SRI ystart:   " << sri.ystart << std::endl;   // unused for sample data
+				std::cout << "SRI ydelta:   " << sri.ydelta << std::endl;   // unused for sample data
+				std::cout << "SRI yunits:   " << sri.yunits << std::endl;   // unused for sample data
+				std::cout << "SRI subsize:  " << sri.subsize << std::endl;  // = 0 for sample data
+				 */
+				// TODO when do I update SRI?
+				bool sriChanged = false;
 
-		// Write to the output stream
-		outputStream.write(outputData, tstamp);
+				// If there is no output stream open, create one
+				if (!outputStream) {
+					outputStream = dataFloat_out->createStream(sri);
+				} else if (sriChanged) {			// Update output SRI
+					outputStream.sri(sri);
+				}
 
-		// Propagate end-of-stream
-		// TODO when would eos happen?
-		bool eos = false;
-		if (eos) {
-		  outputStream.close();
-		}
+				// copy timestamp from LimeSDR into BulkIO type
+				// TODO LimeSDR timestamp is just tick mark based on start time... not sure what units are or how to map to UTC
+				BULKIO::PrecisionUTCTime tstamp;
+				tstamp.tcmode = 1; // deprecated, default value
+				tstamp.tcstatus = BULKIO::TCS_INVALID; // indicates whether timestamp is valid and should be used
+				tstamp.toff = 0; // fractional sample offset
+				tstamp.twsec = metadata.timestamp; // whole seconds from Epoch
+				tstamp.tfsec = 0; // fractional seconds from Epoch
 
+				//std::cout << "Recv " << tuner_id << std::endl;
+				// Write to the output stream
+				outputStream.write(outputData, tstamp);
+
+				// Propagate end-of-stream
+				// TODO when would eos happen?
+				bool eos = false;
+				if (eos) {
+				  outputStream.close();
+				}
+
+
+				/*
+				// print stream stats
+				lms_stream_status_t status;
+				LMS_GetStreamStatus(&streamId, &status);
+
+				std::cout << "Stream Status " << std::endl;
+				std::cout << "  Active:      " << status.active << std::endl;
+				std::cout << "  Timestamp:   " << status.timestamp << std::endl;
+				std::cout << "  Underrun:    " << status.underrun << std::endl;
+				std::cout << "  Overrun:     " << status.overrun << std::endl;
+
+				// TODO some bug in these statements
+				//std::cout << "  Data Rate:   " << status.linkRate / 1e6 << " MB/s\n";                            // link data rate
+				//std::cout << "  Sample Rate: " << status.sampleRate / 1e6 << " MSamples/s\n";                    // link data rate
+				//std::cout << "  Fifo Filled: " << 100 * status.fifoFilledCount / status.fifoSize << "%" << std::endl; // percentage of FIFO filled
+				std::cout << "end " << std::endl;
+				*/
+	    }
 		return NORMAL;
-
-		/*
-		// print stream stats
-		lms_stream_status_t status;
-		LMS_GetStreamStatus(&streamId, &status);
-
-		std::cout << "Stream Status " << std::endl;
-		std::cout << "  Active:      " << status.active << std::endl;
-		std::cout << "  Timestamp:   " << status.timestamp << std::endl;
-		std::cout << "  Underrun:    " << status.underrun << std::endl;
-		std::cout << "  Overrun:     " << status.overrun << std::endl;
-
-		// TODO some bug in these statements
-		//std::cout << "  Data Rate:   " << status.linkRate / 1e6 << " MB/s\n";                            // link data rate
-		//std::cout << "  Sample Rate: " << status.sampleRate / 1e6 << " MSamples/s\n";                    // link data rate
-		//std::cout << "  Fifo Filled: " << 100 * status.fifoFilledCount / status.fifoSize << "%" << std::endl; // percentage of FIFO filled
-		std::cout << "end " << std::endl;
-		*/
 	}
     
     return NOOP;
@@ -712,6 +749,7 @@ void LimeSDR_FEI_i::allocateLimeSDR(int channel, bool transmit, double freq, dou
     if (LMS_SetLOFrequency(device, transmit, channel, freq) != 0) { Error(LMS_GetLastErrorMessage()); }
 	std::cout << "LMS_SetLOFrequency" << std::endl;
 
+	//TODO make this a property and move setter to constructor
 	if (!sample) {
 		if (LMS_SetSampleRate(device, sample_rate, oversample_ratio) != 0) { Error(LMS_GetLastErrorMessage()); } // preferred oversampling in RF, this set sampling rate for all channels
 		std::cout << "LMS_SetSampleRate" << std::endl;
@@ -720,11 +758,22 @@ void LimeSDR_FEI_i::allocateLimeSDR(int channel, bool transmit, double freq, dou
 
 	if (LMS_SetLPFBW(device, transmit, channel, bandwidth) != 0) { Error(LMS_GetLastErrorMessage()); }      // configure LPF
 	std::cout << "LMS_SetLPFBW" << std::endl;
-//	if (LMS_SetGaindB(device, transmit, channel, gain) != 0) { Error(LMS_GetLastErrorMessage()); }  // set RX gain
+/*
+	float normGain = 0.4;
+	if (transmit) {
+		normGain = 0.7;
+	}
+
+	if(LMS_SetNormalizedGain(device, transmit, channel, normGain) != 0) { Error(LMS_GetLastErrorMessage()); }
+*/
+	//	if (LMS_SetGaindB(device, transmit, channel, gain) != 0) { Error(LMS_GetLastErrorMessage()); }  // set RX gain
 //	// TODO what does LMS_SetGFIRLPF do?
 //	std::cout << "LMS_SetGaindB" << std::endl;
-//	if (LMS_Calibrate(device, transmit, channel, bandwidth, 0) != 0) { Error(LMS_GetLastErrorMessage()); } 	// perform automatic calibration (last arg are flags)
-    LOG_DEBUG(LimeSDR_FEI_i, "<-- allocateLimeSDR()");
+	if (transmit) {
+		//if (LMS_SetTestSignal(device, LMS_CH_TX, channel, LMS_TESTSIG_NCODIV4, 0, 0) != 0) { Error(LMS_GetLastErrorMessage()); }
+		//if (LMS_Calibrate(device, transmit, channel, bandwidth, 0) != 0) { Error(LMS_GetLastErrorMessage()); } 	// perform automatic calibration (last arg are flags)
+	}
+	LOG_DEBUG(LimeSDR_FEI_i, "<-- allocateLimeSDR()");
 }
 
 /*************************************************************
@@ -832,28 +881,14 @@ bool LimeSDR_FEI_i::deviceSetTuning(const frontend::frontend_tuner_allocation_st
 		id = 1;
 	}
 
-	std::cout << "TEST " << std::endl;
-	std::cout << "Channel: " << streamId[id].channel << std::endl;
-	std::cout << "fifoSize: " << streamId[id].fifoSize << std::endl;
-	std::cout << "throughputVsLatency: " << streamId[id].throughputVsLatency << std::endl;
-	std::cout << "isTx: " << streamId[id].isTx << std::endl;
-	std::cout << "dataFmt:  " << streamId[id].dataFmt << std::endl;
-
 	// initialize stream
 	// TODO make some of these things properties?
 
 	streamId[id].channel = channel;                      // channel number to stream from
 	streamId[id].fifoSize = 1024 * 1024;                 // fifo size in samples
-	streamId[id].throughputVsLatency = 1.0;              // optimize for max throughput
+	streamId[id].throughputVsLatency = 0.5;              // optimize for max throughput
 	streamId[id].isTx = transmit;                        // TX or RX channel
 	streamId[id].dataFmt = lms_stream_t::LMS_FMT_F32;    // 32-bit floats
-
-	std::cout << "TEST " << std::endl;
-	std::cout << "Channel: " << streamId[id].channel << std::endl;
-	std::cout << "fifoSize: " << streamId[id].fifoSize << std::endl;
-	std::cout << "throughputVsLatency: " << streamId[id].throughputVsLatency << std::endl;
-	std::cout << "isTx: " << streamId[id].isTx << std::endl;
-	std::cout << "dataFmt:  " << streamId[id].dataFmt << std::endl;
 
 	if (LMS_SetupStream(device, &(streamId[id])) != 0) { Error(LMS_GetLastErrorMessage()); }
 

@@ -168,7 +168,7 @@ void LimeSDR_FEI_base::loadProperties()
     addProperty(device_channels,
                 "device_channels",
                 "device_channels",
-                "readonly",
+                "readwrite",
                 "",
                 "external",
                 "property");
