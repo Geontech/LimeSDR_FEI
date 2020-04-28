@@ -208,7 +208,7 @@ void TX(double f_ratio, double tone_freq, bool stats) {
             LMS_GetStreamStatus(&streams[1], &status);  //Get stream status
             cout << "TX data rate: " << status.linkRate / 1e6 << " MB/s\n"; //link data rate
         }
-	}
+    }
 	
 	
     //Stop streaming
