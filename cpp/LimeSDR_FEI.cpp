@@ -366,43 +366,35 @@ int LimeSDR_FEI_i::serviceFunctionReceive() {
 
 	// only do stuff if there's a device, serviceFunction gets called even if no device found in constructor
 	if (device && channel_active) {
-		/*for (size_t tuner_id = 0; tuner_id < frontend_tuner_status.size(); tuner_id++) {
-			if (frontend_tuner_status[tuner_id].tuner_type != "RX_DIGITIZER")
-				continue;
-
-			if (getControlAllocationId(tuner_id).empty()) {
-				continue;
-
-			}
-		}*/
-		// receive samples (non-blocking?)
-		// TODO make some of this properties
-		lms_stream_meta_t metadata;
-		//metadata.timestamp            // either the rx timestamp or time that tx should start
-		//metadata.waitForTimestamp     // wait for specified timestamp before receiving or transmitting
-		int timeout_ms = 1000;
-		int samplesRead = LMS_RecvStream(&(streamId[0]), buffer, numsamples, &metadata, timeout_ms);
-
-		//std::cout << "Number of Samples: " << samplesRead << std::endl;
-		//std::cout << "Data Timestamp: " << metadata.timestamp << std::endl;
-
-		// TODO do stuff with data
-		if (samplesRead==0) { // No data available
-			return NOOP;
-		}
-
-		// copy data from LimeSDR
-		std::vector<float> outputData;
-		outputData.resize(samplesRead);
-		for (size_t index = 0; index < samplesRead; ++index) {
-			outputData[index] = buffer[index];
-		}
-
-		// create SRI
 
 	    for (size_t tuner_id = 0; tuner_id < frontend_tuner_status.size(); tuner_id++) {
-	            //Check to see if wideband channel is either not allocated, or the output is not enabled
-	            if (frontend_tuner_status[tuner_id].tuner_type != "RX_DIGITIZER") { continue; }
+				// create SRI
+				//Check to see if wideband channel is either not allocated, or the output is not enabled
+				if (frontend_tuner_status[tuner_id].tuner_type != "RX_DIGITIZER") { continue; }
+
+				// receive samples (non-blocking?)
+				// TODO make some of this properties
+				lms_stream_meta_t metadata;
+				//metadata.timestamp            // either the rx timestamp or time that tx should start
+				//metadata.waitForTimestamp     // wait for specified timestamp before receiving or transmitting
+				int timeout_ms = 1000;
+				int samplesRead = LMS_RecvStream(&(streamId[0]), buffer, numsamples, &metadata, timeout_ms);
+
+				//std::cout << "Number of Samples: " << samplesRead << std::endl;
+				//std::cout << "Data Timestamp: " << metadata.timestamp << std::endl;
+
+				// TODO do stuff with data
+				if (samplesRead<=0) { // No data available
+					return NOOP;
+				}
+
+				// copy data from LimeSDR
+				std::vector<float> outputData;
+				outputData.resize(samplesRead);
+				for (size_t index = 0; index < samplesRead; ++index) {
+					outputData[index] = buffer[index];
+				}
+
 
 	            std::string stream_id = "my_stream_id";
 				BULKIO::StreamSRI sri = this->create(stream_id, this->frontend_tuner_status[tuner_id], this->frontend_tuner_status[tuner_id].center_frequency);
@@ -643,8 +635,8 @@ void LimeSDR_FEI_i::getChannelStatus(int channel, bool transmit) {
     if (LMS_GetGaindB(device, transmit, channel, &gain) != 0) { Error(LMS_GetLastErrorMessage()); }
 	std::cout << "  Gain:             " << gain << std::endl;
 
-	unsigned int normal_gain;
-    if (LMS_GetGaindB(device, transmit, channel, &normal_gain) != 0) { Error(LMS_GetLastErrorMessage()); }
+	double normal_gain;
+    if (LMS_GetNormalizedGain(device, transmit, channel, &normal_gain) != 0) { Error(LMS_GetLastErrorMessage()); }
 	std::cout << "  Normalized Gain:  " << normal_gain << std::endl;
 
 	double rf_sample_rate;
@@ -674,7 +666,7 @@ void LimeSDR_FEI_i::getChannelStatus(int channel, bool transmit) {
 				// update things that we actually get from LimeSDR "Get" functions
 				frontend_tuner_status[tuner_id].center_frequency = freq;
 				frontend_tuner_status[tuner_id].bandwidth = bandwidth;
-				frontend_tuner_status[tuner_id].gain = normal_gain;
+				frontend_tuner_status[tuner_id].gain = gain;
 				// TODO because of the 2x oversample thing, use host rate which reflects the SetSampleRate requests.... need to figure out what is real
 				// TODO ..also, the returned sample rate always seems to be a slight fraction less than what was set... so I'm rounding for now
 				frontend_tuner_status[tuner_id].sample_rate = round(host_sample_rate);
@@ -685,7 +677,7 @@ void LimeSDR_FEI_i::getChannelStatus(int channel, bool transmit) {
 				// update things that we actually get from LimeSDR "Get" functions
 				frontend_tuner_status[tuner_id].center_frequency = freq;
 				frontend_tuner_status[tuner_id].bandwidth = bandwidth;
-				frontend_tuner_status[tuner_id].gain = normal_gain;
+				frontend_tuner_status[tuner_id].gain = gain;
 				// TODO because of the 2x oversample thing, use host rate which reflects the SetSampleRate requests.... need to figure out what is real
 				frontend_tuner_status[tuner_id].sample_rate = round(host_sample_rate);
 				// TODO need to track antennas?
@@ -696,6 +688,7 @@ void LimeSDR_FEI_i::getChannelStatus(int channel, bool transmit) {
 
 	if (num_updated == 0) { LOG_ERROR(LimeSDR_FEI_i, "No channels matched request or were available."); }
 	else if (num_updated > 1) { LOG_ERROR(LimeSDR_FEI_i, "More than 1 channel matched request and was updated."); }
+	else { std::cout << "  Updated the tuner" << std::endl; }
 
     LOG_DEBUG(LimeSDR_FEI_i, "<-- getChannelStatus()");
 }
@@ -746,8 +739,6 @@ void LimeSDR_FEI_i::allocateLimeSDR(int channel, bool transmit, double freq, dou
     // TODO difference between EnableChannel and SetupStream/StartStream.....?
 	if (LMS_EnableChannel(device, transmit, channel, true) != 0) { Error(LMS_GetLastErrorMessage()); }
 	std::cout << "LMS_EnableChannel" << std::endl;
-    if (LMS_SetLOFrequency(device, transmit, channel, freq) != 0) { Error(LMS_GetLastErrorMessage()); }
-	std::cout << "LMS_SetLOFrequency" << std::endl;
 
 	//TODO make this a property and move setter to constructor
 	if (!sample) {
@@ -756,23 +747,35 @@ void LimeSDR_FEI_i::allocateLimeSDR(int channel, bool transmit, double freq, dou
 		sample = true;
 	}
 
+    if (LMS_SetLOFrequency(device, transmit, channel, freq) != 0) { Error(LMS_GetLastErrorMessage()); }
+	std::cout << "LMS_SetLOFrequency" << std::endl;
+
+
 	if (LMS_SetLPFBW(device, transmit, channel, bandwidth) != 0) { Error(LMS_GetLastErrorMessage()); }      // configure LPF
 	std::cout << "LMS_SetLPFBW" << std::endl;
-/*
-	float normGain = 0.4;
+
 	if (transmit) {
-		normGain = 0.7;
+		if(LMS_SetNormalizedGain(device, LMS_CH_TX, channel, 1) != 0) { Error(LMS_GetLastErrorMessage()); }
+		if (LMS_SetGaindB(device, LMS_CH_TX, channel, 73) != 0) { Error(LMS_GetLastErrorMessage()); }  // set RX gain
+		std::cout << "LMS_SetGaindB" << std::endl;
+	}
+	else {
+
+		//if(LMS_SetNormalizedGain(device, LMS_CH_RX, channel, 1) != 0) { Error(LMS_GetLastErrorMessage()); }
+		//if (LMS_SetGaindB(device, LMS_CH_RX, channel, 73) != 0) { Error(LMS_GetLastErrorMessage()); }  // set RX gain
+		//std::cout << "LMS_SetGaindB" << std::endl;
 	}
 
-	if(LMS_SetNormalizedGain(device, transmit, channel, normGain) != 0) { Error(LMS_GetLastErrorMessage()); }
-*/
-	//	if (LMS_SetGaindB(device, transmit, channel, gain) != 0) { Error(LMS_GetLastErrorMessage()); }  // set RX gain
-//	// TODO what does LMS_SetGFIRLPF do?
-//	std::cout << "LMS_SetGaindB" << std::endl;
+
 	if (transmit) {
-		//if (LMS_SetTestSignal(device, LMS_CH_TX, channel, LMS_TESTSIG_NCODIV4, 0, 0) != 0) { Error(LMS_GetLastErrorMessage()); }
-		//if (LMS_Calibrate(device, transmit, channel, bandwidth, 0) != 0) { Error(LMS_GetLastErrorMessage()); } 	// perform automatic calibration (last arg are flags)
+		LMS_Calibrate(device, LMS_CH_TX, channel, bandwidth, 0);
 	}
+	else {
+		if (LMS_Calibrate(device, LMS_CH_RX, channel, bandwidth, 0) != 0) { Error(LMS_GetLastErrorMessage()); } 	// perform automatic calibration (last arg are flags)
+	}
+	//if (LMS_SetTestSignal(device, transmit, channel, lms_testsig_t(test_signal), 0, 0) != 0) { Error(LMS_GetLastErrorMessage()); }
+
+	// TODO what does LMS_SetGFIRLPF do?
 	LOG_DEBUG(LimeSDR_FEI_i, "<-- allocateLimeSDR()");
 }
 

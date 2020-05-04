@@ -238,4 +238,17 @@ False: Does not need control and can just attach to any currently tasked device 
     <kind kindtype="property"/>
     <action type="external"/>
   </simple>
+  <simple id="test_signal" mode="readwrite" name="test_signal" type="long" complex="false">
+    <value>0</value>
+    <enumerations>
+      <enumeration label="LMS_TESTSIG_NONE" value="0"/>
+      <enumeration label="LMS_TESTSIG_NCODIV8" value="1"/>
+      <enumeration label="LMS_TESTSIG_NCODIV4" value="2"/>
+      <enumeration label="LMS_TESTSIG_NCODIV8F" value="3"/>
+      <enumeration label="LMS_TESTSIG_NCODIV4F" value="4"/>
+      <enumeration label="LMS_TESTSIG_DC" value="5"/>
+    </enumerations>
+    <kind kindtype="property"/>
+    <action type="external"/>
+  </simple>
 </properties>

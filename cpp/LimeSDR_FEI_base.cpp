@@ -173,6 +173,14 @@ void LimeSDR_FEI_base::loadProperties()
                 "external",
                 "property");
 
+    addProperty(test_signal,
+                "test_signal",
+                "test_signal",
+                "readwrite",
+                "",
+                "external",
+                "property");
+
 }
 
 void LimeSDR_FEI_base::frontendTunerStatusChanged(const std::vector<frontend_tuner_status_struct_struct>* oldValue, const std::vector<frontend_tuner_status_struct_struct>* newValue)

@@ -144,14 +144,14 @@ void RX(bool stats) {
         //printf("Received %d samples\n", samplesRead);
         
         for (int i = 0; i < samplesRead; i++) {
-		    if (true/*buffer[i] > .1 || buffer[i] < -.1*/) {
-				if (i%2 == 0) {
-					std::cout << "IMAG: " << i << " " << buffer[i] << std::endl;
-			   	}
-			   	else {
-					std::cout << "REAL: " << i << " " << buffer[i] << std::endl;
-			   	}
+		if (true/*buffer[i] > .1 || buffer[i] < -.1*/) {
+			if (i%2 == 0) {
+				std::cout << "IMAG: " << i << " " << buffer[i] << std::endl;
 		   	}
+		   	else {
+				std::cout << "REAL: " << i << " " << buffer[i] << std::endl;
+		   	}
+		}
         }
         //Print data rate (once per second)
         if (chrono::high_resolution_clock::now() - t2 > chrono::seconds(1) && stats)
@@ -238,9 +238,9 @@ int main(int argc, char *argv[]) {
 
 	const double bandwidth = 10e6;
 	const double frequency = 200e6;  //center frequency to 500 MHz
-    const double sample_rate = 5e6;    //sample rate to 5 MHz
-    const double tone_freq = 1e6; //tone frequency
-    const double f_ratio = tone_freq/sample_rate;
+	const double sample_rate = 5e6;    //sample rate to 5 MHz
+	const double tone_freq = 1e6; //tone frequency
+	const double f_ratio = tone_freq/sample_rate;
 	if(device_init(sample_rate)) {
 		error();
 		return 255;
@@ -258,9 +258,9 @@ int main(int argc, char *argv[]) {
 	//rx.join();
 	tx.join();
 
-    //Close device
-    if (LMS_Close(device)==0) {
-        cout << "Closed" << endl;
+	//Close device
+	if (LMS_Close(device)==0) {
+		cout << "Closed" << endl;
 	}
 	return 0;
 }

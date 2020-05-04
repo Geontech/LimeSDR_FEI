@@ -11,6 +11,18 @@
 
 #define BOOL_VALUE_HERE 0
 
+namespace enums {
+    // Enumerated values for test_signal
+    namespace test_signal {
+        static const CORBA::Long LMS_TESTSIG_NONE = 0;
+        static const CORBA::Long LMS_TESTSIG_NCODIV8 = 1;
+        static const CORBA::Long LMS_TESTSIG_NCODIV4 = 2;
+        static const CORBA::Long LMS_TESTSIG_NCODIV8F = 3;
+        static const CORBA::Long LMS_TESTSIG_NCODIV4F = 4;
+        static const CORBA::Long LMS_TESTSIG_DC = 5;
+    }
+}
+
 class LimeSDR_FEI_base : public frontend::FrontendTunerDevice<frontend_tuner_status_struct_struct>, public virtual frontend::digital_tuner_delegation, public virtual frontend::rfinfo_delegation, protected ThreadedComponent
 {
     public:
@@ -46,6 +58,8 @@ class LimeSDR_FEI_base : public frontend::FrontendTunerDevice<frontend_tuner_sta
         std::string device_addr;
         /// Property: reset
         bool reset;
+        /// Property: test_signal
+        CORBA::Long test_signal;
         /// Property: connectionTable
         std::vector<connection_descriptor_struct> connectionTable;
         /// Property: device_channels
